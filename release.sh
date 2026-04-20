@@ -9,6 +9,13 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$REPO_DIR"
 
+# 检查是否有未提交的改动
+if [ -n "$(git status --porcelain)" ]; then
+    echo "❌ 存在未提交的改动，请先提交或stash："
+    git status --short
+    exit 1
+fi
+
 echo "========================================"
 echo "📦 React Native Bundle Release"
 echo "========================================"
