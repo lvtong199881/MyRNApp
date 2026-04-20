@@ -252,9 +252,12 @@ echo "📤 上传 bundle 文件..."
 upload_asset "dist/index.android.bundle" "index.android.bundle"
 upload_asset "dist/index.ios.bundle" "index.ios.bundle"
 
+# 转换 COMMIT_PREFIX 首字母大写
+PREFIX_DISPLAY=$(echo "$COMMIT_PREFIX" | sed 's/.*/\U&/')
+
 echo ""
 echo "========================================"
-echo "🎉 ${COMMIT_PREFIX^} v$NEW_VERSION 完成!"
+echo "🎉 ${PREFIX_DISPLAY} v$NEW_VERSION 完成!"
 echo "========================================"
 echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
 echo "========================================"
