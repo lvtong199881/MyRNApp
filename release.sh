@@ -1,6 +1,9 @@
 #!/bin/bash
 # React Native Bundle 发布脚本
-# 用法: ./release.sh
+# 用法:
+#   ./release.sh          - 执行完整流程（构建+发布）
+#   ./release.sh build    - 仅构建 bundle，不发布
+#   ./release.sh publish  - 仅发布（需要先运行 build）
 
 set -e
 
@@ -39,119 +42,144 @@ if [ "$NODE_VERSION" -lt 18 ]; then
     exit 1
 fi
 
+MODE="${1:-all}"
+
 echo "========================================"
 echo "📦 React Native Bundle Release"
 echo "========================================"
 
-# 1. 读取当前版本
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo "📌 当前版本: $CURRENT_VERSION"
+# ========== 构建阶段 ==========
+if [ "$MODE" == "build" ] || [ "$MODE" == "all" ]; then
+    echo "🔨 构建模式..."
 
-# 2. 自增 patch 版本
-IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-MAJOR="${VERSION_PARTS[0]}"
-MINOR="${VERSION_PARTS[1]}"
-PATCH="${VERSION_PARTS[2]:-0}"
-NEW_PATCH=$((PATCH + 1))
-NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-echo "🆕 新版本: $CURRENT_VERSION → $NEW_VERSION"
+    # 1. 读取当前版本
+    CURRENT_VERSION=$(node -p "require('./package.json').version")
+    echo "📌 当前版本: $CURRENT_VERSION"
 
-# 3. 更新 package.json
-node -e "
+    # 2. 自增 patch 版本
+    IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+    MAJOR="${VERSION_PARTS[0]}"
+    MINOR="${VERSION_PARTS[1]}"
+    PATCH="${VERSION_PARTS[2]:-0}"
+    NEW_PATCH=$((PATCH + 1))
+    NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+    echo "🆕 新版本: $CURRENT_VERSION → $NEW_VERSION"
+
+    # 保存版本号供 publish 阶段使用
+    echo "$NEW_VERSION" > .release_version
+
+    # 3. 更新 package.json
+    node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 pkg.version = '$NEW_VERSION';
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
-echo "✅ package.json 已更新"
+    echo "✅ package.json 已更新"
 
-# 4. npm install 更新 package-lock.json
-echo "📦 运行 npm install..."
-npm install --silent
-echo "✅ package-lock.json 已更新"
+    # 4. npm install 更新 package-lock.json
+    echo "📦 运行 npm install..."
+    npm install --silent
+    echo "✅ package-lock.json 已更新"
 
-# 5. 打包 bundle（Android + iOS）
-echo "🔨 打包 bundle..."
-mkdir -p dist
+    # 5. 打包 bundle（Android + iOS）
+    echo "🔨 打包 bundle..."
+    mkdir -p dist
 
-node node_modules/@react-native-community/cli/build/bin.js bundle \
-  --platform android \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
-echo "✅ Android Bundle: dist/index.android.bundle"
+    node node_modules/@react-native-community/cli/build/bin.js bundle \
+      --platform android \
+      --dev false \
+      --entry-file index.js \
+      --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
+    echo "✅ Android Bundle: dist/index.android.bundle"
 
-node node_modules/@react-native-community/cli/build/bin.js bundle \
-  --platform ios \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output ./dist/index.ios.bundle > /dev/null 2>&1
-echo "✅ iOS Bundle: dist/index.ios.bundle"
+    node node_modules/@react-native-community/cli/build/bin.js bundle \
+      --platform ios \
+      --dev false \
+      --entry-file index.js \
+      --bundle-output ./dist/index.ios.bundle > /dev/null 2>&1
+    echo "✅ iOS Bundle: dist/index.ios.bundle"
 
-# 6. 获取上一个版本的 commit SHA
-PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')
-echo "📝 上一个版本 commit: $PREV_COMMIT"
+    echo ""
+    echo "========================================"
+    echo "✅ 构建完成！版本: $NEW_VERSION"
+    echo "========================================"
+fi
 
-# 7. 生成 changelog 内容
-CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
+# ========== 发布阶段 ==========
+if [ "$MODE" == "publish" ] || [ "$MODE" == "all" ]; then
+    if [ ! -f .release_version ]; then
+        echo "❌ 请先运行 build 模式"
+        exit 1
+    fi
+
+    NEW_VERSION=$(cat .release_version)
+    rm .release_version
+
+    echo "📦 发布模式..."
+
+    # 6. 获取上一个版本的 commit SHA
+    PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')
+    echo "📝 上一个版本 commit: $PREV_COMMIT"
+
+    # 7. 生成 changelog 内容
+    CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 
 ### 改动
 "
-# 获取自上一个版本以来的所有 commit
-COMMITS=$(git log $PREV_COMMIT..HEAD --oneline --format="- %s")
-if [ -n "$COMMITS" ]; then
-    CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+    # 获取自上一个版本以来的所有 commit
+    COMMITS=$(git log $PREV_COMMIT..HEAD --oneline --format="- %s")
+    if [ -n "$COMMITS" ]; then
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
-else
-    CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+    else
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 - 自动版本更新"
-fi
-CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+    fi
+    CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 
 "
 
-# 8. 更新 CHANGELOG.md
-if [ -f CHANGELOG.md ]; then
-    echo "$CHANGELOG_CONTENT" | cat - CHANGELOG.md > temp_changelog.md && mv temp_changelog.md CHANGELOG.md
-else
-    echo "# Changelog" > CHANGELOG.md
-    echo "" >> CHANGELOG.md
-    echo "$CHANGELOG_CONTENT" >> CHANGELOG.md
-fi
-echo "✅ CHANGELOG.md 已更新"
+    # 8. 更新 CHANGELOG.md
+    if [ -f CHANGELOG.md ]; then
+        echo "$CHANGELOG_CONTENT" | cat - CHANGELOG.md > temp_changelog.md && mv temp_changelog.md CHANGELOG.md
+    else
+        echo "# Changelog" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "$CHANGELOG_CONTENT" >> CHANGELOG.md
+    fi
+    echo "✅ CHANGELOG.md 已更新"
 
-# 9. Git 提交
-git add -A
-git commit -m "release: v$NEW_VERSION"
-echo "✅ 已提交: release: v$NEW_VERSION"
+    # 9. Git 提交
+    git add -A
+    git commit -m "release: v$NEW_VERSION"
+    echo "✅ 已提交: release: v$NEW_VERSION"
 
-# 10. Git 推送
-git push
-echo "✅ 已推送到远程仓库"
+    # 10. Git 推送
+    git push
+    echo "✅ 已推送到远程仓库"
 
-# 11. 创建 git tag
-git tag -a "v$NEW_VERSION" -m "React Native Bundle v$NEW_VERSION"
-git push origin "v$NEW_VERSION"
-echo "✅ 已创建并推送 tag: v$NEW_VERSION"
+    # 11. 创建 git tag
+    git tag -a "v$NEW_VERSION" -m "React Native Bundle v$NEW_VERSION"
+    git push origin "v$NEW_VERSION"
+    echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
-# 12. 创建 GitHub Release（如果不存在）
-echo "📦 创建 GitHub Release..."
-RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"React Native Bundle v${NEW_VERSION}\"}")
+    # 12. 创建 GitHub Release
+    echo "📦 创建 GitHub Release..."
+    RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"React Native Bundle v${NEW_VERSION}\"}")
 
-# 检查是否创建成功（可能已存在）
-if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
-    echo "✅ Release v$NEW_VERSION 已创建"
-else
-    # 可能已存在，获取现有 release
-    echo "ℹ️ Release 可能已存在，尝试获取..."
-fi
+    if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
+        echo "✅ Release v$NEW_VERSION 已创建"
+    else
+        echo "ℹ️ Release 可能已存在，尝试获取..."
+    fi
 
-# 13. 获取 release ID
-RELEASE_ID=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${NEW_VERSION}" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" | node -e "
+    # 13. 获取 release ID
+    RELEASE_ID=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${NEW_VERSION}" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" | node -e "
 const data = require('fs').readFileSync(0, 'utf8');
 try {
   const json = JSON.parse(data);
@@ -161,32 +189,38 @@ try {
 }
 ")
 
-if [ -z "$RELEASE_ID" ]; then
-    echo "❌ 无法获取 Release ID"
-    exit 1
+    if [ -z "$RELEASE_ID" ]; then
+        echo "❌ 无法获取 Release ID"
+        exit 1
+    fi
+    echo "📦 Release ID: $RELEASE_ID"
+
+    # 14. 上传 bundle 文件到 Release
+    echo "📤 上传 bundle 文件..."
+
+    curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.android.bundle" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary @dist/index.android.bundle > /dev/null
+    echo "✅ Android Bundle 已上传"
+
+    curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.ios.bundle" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary @dist/index.ios.bundle > /dev/null
+    echo "✅ iOS Bundle 已上传"
+
+    echo ""
+    echo "========================================"
+    echo "🎉 Release v$NEW_VERSION 完成!"
+    echo "========================================"
+    echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
+    echo "========================================"
 fi
-echo "📦 Release ID: $RELEASE_ID"
 
-# 14. 上传 bundle 文件到 Release
-echo "📤 上传 bundle 文件..."
-
-# Android bundle
-curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.android.bundle" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary @dist/index.android.bundle > /dev/null
-echo "✅ Android Bundle 已上传"
-
-# iOS bundle
-curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.ios.bundle" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary @dist/index.ios.bundle > /dev/null
-echo "✅ iOS Bundle 已上传"
-
-echo ""
-echo "========================================"
-echo "🎉 Release v$NEW_VERSION 完成!"
-echo "========================================"
-echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
-echo "========================================"
+if [ "$MODE" != "build" ] && [ "$MODE" != "publish" ] && [ "$MODE" != "all" ]; then
+    echo "用法:"
+    echo "  ./release.sh          - 执行完整流程（构建+发布）"
+    echo "  ./release.sh build    - 仅构建 bundle，不发布"
+    echo "  ./release.sh publish  - 仅发布（需要先运行 build）"
+fi
