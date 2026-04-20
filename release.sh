@@ -6,8 +6,6 @@ set -e
 
 # 配置
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-CDN_BASE="https://github.com/lvtong199881/MyRNApp/raw/main/dist"
-BUNDLE_URL="${CDN_BASE}/index.android.bundle"
 
 cd "$REPO_DIR"
 
@@ -59,9 +57,6 @@ echo "📝 上一个版本 commit: $PREV_COMMIT"
 # 7. 生成 changelog 内容
 CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 
-### Bundle
-- 下载: ${BUNDLE_URL}
-
 ### 改动
 "
 # 获取自上一个版本以来的所有 commit
@@ -104,6 +99,4 @@ echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 echo ""
 echo "========================================"
 echo "🎉 Release v$NEW_VERSION 完成!"
-echo "========================================"
-echo "Bundle 下载: $BUNDLE_URL"
 echo "========================================"
