@@ -1,3 +1,10 @@
+## v0.0.1 (2026-04-21)
+
+### 改动
+
+- fix: 推送前先 pull rebase 处理并发冲突 ([7ac74c7](https://github.com/lvtong199881/MyRNApp/commit/7ac74c7f4204f30491e8bf1465b57ead7c80561c))
+
+
 ## v0.0.12 (2026-04-21)
 
 ### 改动
