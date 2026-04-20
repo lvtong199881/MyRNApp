@@ -147,7 +147,7 @@ CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 "
 COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
 if [ "$PREV_COMMIT" != "initial" ]; then
-    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
+    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null | grep -v -E "$COMMIT_FILTER" || true)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -156,7 +156,7 @@ ${COMMITS}"
 - 自动版本更新"
     fi
 else
-    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
+    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null | grep -v -E "$COMMIT_FILTER" || true)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -191,9 +191,9 @@ echo "✅ 已推送到远程仓库"
 # 10. 生成 tag message 并创建 tag
 echo "📝 生成 commit diff..."
 if [ "$PREV_COMMIT" != "initial" ]; then
-    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
+    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null | grep -v -E "$COMMIT_FILTER" || true)
 else
-    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
+    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null | grep -v -E "$COMMIT_FILTER" || true)
 fi
 git tag -a "v$NEW_VERSION" -m "${TAG_MESSAGE}"
 git push origin "v$NEW_VERSION"
