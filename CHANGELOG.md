@@ -1,3 +1,8 @@
+## v1.0.2 (2026-04-21)
+
+### 改动
+
+- chore: 优化 commit message 格式 ([da81117](https://github.com/lvtong199881/MyRNApp/commit/da81117bf826c83b0e6b13e90580950b1b8a244d))
 ## v1.0.1.2 (2026-04-21)
 
 ### 改动
