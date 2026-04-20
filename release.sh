@@ -51,14 +51,21 @@ echo "✅ package-lock.json 已更新"
 echo "🔨 打包 bundle..."
 mkdir -p dist
 
-~/.nvm/versions/node/v24.14.0/bin/node node_modules/@react-native-community/cli/build/bin.js bundle \
+# 优先使用 nvm 的 node，否则使用系统 node
+if [ -d "$HOME/.nvm/versions/node/v24.14.0/bin/node" ]; then
+    NODE_CMD="$HOME/.nvm/versions/node/v24.14.0/bin/node"
+else
+    NODE_CMD="node"
+fi
+
+$NODE_CMD node_modules/@react-native-community/cli/build/bin.js bundle \
   --platform android \
   --dev false \
   --entry-file index.js \
   --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
 echo "✅ Android Bundle: dist/index.android.bundle"
 
-~/.nvm/versions/node/v24.14.0/bin/node node_modules/@react-native-community/cli/build/bin.js bundle \
+$NODE_CMD node_modules/@react-native-community/cli/build/bin.js bundle \
   --platform ios \
   --dev false \
   --entry-file index.js \
