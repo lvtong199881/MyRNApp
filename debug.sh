@@ -1,6 +1,6 @@
 #!/bin/bash
 # React Native Bundle Debug 发布脚本
-# 用法: ./release-debug.sh
+# 用法: ./debug.sh
 
 set -e
 
@@ -43,28 +43,42 @@ echo "========================================"
 echo "🔧 React Native Bundle Debug Release"
 echo "========================================"
 
-# 1. 获取当前 release 版本号，并生成 debug 版本
-CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
-if [ -z "$CURRENT_VERSION" ]; then
+# 1. 获取最新 release 版本号，生成 debug 版本
+CURRENT_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+if [ -z "$CURRENT_RELEASE" ]; then
     echo "❌ 未找到 release 版本 tag"
     exit 1
 fi
-echo "📌 当前 release 版本: $CURRENT_VERSION"
+echo "📌 当前 release 版本: $CURRENT_RELEASE"
 
 # 查找该 release 版本之后的最新 debug 版本号
-LATEST_DEBUG=$(git tag -l | grep "^v${CURRENT_VERSION}." | sort -V | tail -1 | sed 's/^v//')
+LATEST_DEBUG=$(git tag -l | grep "^v${CURRENT_RELEASE}\\." | sort -V | tail -1 | sed 's/^v//')
 if [ -z "$LATEST_DEBUG" ]; then
     # 第一个 debug 版本
-    NEW_VERSION="${CURRENT_VERSION}.0"
+    NEW_VERSION="${CURRENT_RELEASE}.0"
 else
     # 自增最后一位
     LAST_NUM=$(echo "$LATEST_DEBUG" | awk -F. '{print $NF}')
     NEW_NUM=$((LAST_NUM + 1))
-    NEW_VERSION="${CURRENT_VERSION}.${NEW_NUM}"
+    NEW_VERSION="${CURRENT_RELEASE}.${NEW_NUM}"
 fi
-echo "🔖 Debug 版本: $CURRENT_VERSION → $NEW_VERSION"
+echo "🆕 Debug 版本: $CURRENT_RELEASE → $NEW_VERSION"
 
-# 2. 打包 bundle（Android + iOS）
+# 2. 更新 package.json
+node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+pkg.version = '$NEW_VERSION';
+fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+echo "✅ package.json 已更新"
+
+# 3. npm install 更新 package-lock.json
+echo "📦 运行 npm install..."
+npm install --silent
+echo "✅ package-lock.json 已更新"
+
+# 4. 清理并打包 bundle（Android + iOS）
 echo "🔨 打包 bundle..."
 rm -rf dist/
 mkdir -p dist
@@ -99,22 +113,86 @@ if [ ! -s dist/index.ios.bundle ]; then
 fi
 echo "✅ iOS Bundle: dist/index.ios.bundle"
 
-# 3. 创建 git tag
-echo "🏷️ 创建 git tag..."
-git tag -a "v$NEW_VERSION" -m "Debug release v$NEW_VERSION"
+# 5. 获取上一个版本的 commit SHA
+PREV_TAG=$(git describe --tags --abbrev=0 HEAD~0 2>/dev/null | sed 's/^v//')
+if [ -z "$PREV_TAG" ]; then
+    PREV_COMMIT=$(git rev-list --max-parents=0 HEAD --format=%s | head -1)
+    PREV_COMMIT="initial"
+else
+    PREV_COMMIT=$(git log --oneline -1 | awk '{print $1}')
+fi
+echo "📝 上一个版本 commit: $PREV_COMMIT"
+
+# 6. 生成 changelog 内容
+CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
+
+### 改动
+"
+# 获取自上一个版本以来的所有 commit（带链接，排除 release/debug commit）
+COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
+if [ "$PREV_COMMIT" != "initial" ]; then
+    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "release:|debug:" --invert-grep 2>/dev/null)
+    if [ -n "$COMMITS" ]; then
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+${COMMITS}"
+    else
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+- 自动版本更新"
+    fi
+else
+    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "release:|debug:" --invert-grep 2>/dev/null)
+    if [ -n "$COMMITS" ]; then
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+${COMMITS}"
+    else
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+- 初始版本"
+    fi
+fi
+CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+
+"
+
+# 7. 更新 CHANGELOG.md
+if [ -f CHANGELOG.md ]; then
+    echo "$CHANGELOG_CONTENT" | cat - CHANGELOG.md > temp_changelog.md && mv temp_changelog.md CHANGELOG.md
+else
+    echo "# Changelog" > CHANGELOG.md
+    echo "" >> CHANGELOG.md
+    echo "$CHANGELOG_CONTENT" >> CHANGELOG.md
+fi
+echo "✅ CHANGELOG.md 已更新"
+
+# 8. Git 提交
+git add -A
+git commit -m "debug: v$NEW_VERSION"
+echo "✅ 已提交: debug: v$NEW_VERSION"
+
+# 9. Git 推送
+git push
+echo "✅ 已推送到远程仓库"
+
+# 10. 生成 commit diff（带链接，排除 release/debug commit）
+echo "📝 生成 commit diff..."
+COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
+if [ "$PREV_COMMIT" != "initial" ]; then
+    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "release:|debug:" --invert-grep 2>/dev/null)
+else
+    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "release:|debug:" --invert-grep 2>/dev/null)
+fi
+git tag -a "v$NEW_VERSION" -m "${TAG_MESSAGE}"
 git push origin "v$NEW_VERSION"
 echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
-# 4. 创建 GitHub Release
+# 11. 创建 GitHub Release
 echo "📦 创建 GitHub Release..."
 PAYLOAD=$(node -e "
-const msg = 'Debug release v${NEW_VERSION}';
+const msg = \`${TAG_MESSAGE}\`;
 console.log(JSON.stringify({
   tag_name: 'v${NEW_VERSION}',
   name: 'v${NEW_VERSION}',
   body: msg
-}));
-")
+}));")
 RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Content-Type: application/json" \
@@ -127,8 +205,7 @@ try {
   console.log(json.id || '');
 } catch(e) {
   console.log('');
-}
-")
+}")
 
 if [ -z "$RELEASE_ID" ]; then
     echo "❌ Release 创建失败"
@@ -137,7 +214,7 @@ if [ -z "$RELEASE_ID" ]; then
 fi
 echo "✅ Release v$NEW_VERSION 已创建"
 
-# 5. 上传 bundle 文件到 Release
+# 12. 上传 bundle 文件到 Release
 upload_asset() {
     local file="$1"
     local name="$2"
@@ -162,7 +239,7 @@ upload_asset "dist/index.ios.bundle" "index.ios.bundle"
 
 echo ""
 echo "========================================"
-echo "🔧 Debug Release v$NEW_VERSION 完成!"
+echo "🔧 Debug v$NEW_VERSION 完成!"
 echo "========================================"
 echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
 echo "========================================"
