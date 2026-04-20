@@ -210,13 +210,25 @@ echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
 # 11. 创建 GitHub Release
 echo "📦 创建 GitHub Release..."
-PAYLOAD=$(node -e "
+if [ "$MODE" == "debug" ]; then
+    PAYLOAD=$(node -e "
 const msg = \`${TAG_MESSAGE}\`;
 console.log(JSON.stringify({
   tag_name: 'v${NEW_VERSION}',
   name: 'v${NEW_VERSION}',
-  body: msg
+  body: msg,
+  prerelease: true
 }));")
+else
+    PAYLOAD=$(node -e "
+const msg = \`${TAG_MESSAGE}\`;
+console.log(JSON.stringify({
+  tag_name: 'v${NEW_VERSION}',
+  name: 'v${NEW_VERSION}',
+  body: msg,
+  prerelease: false
+}));")
+fi
 RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Content-Type: application/json" \
