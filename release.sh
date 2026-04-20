@@ -16,6 +16,14 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
+# 检查 Node.js 版本
+echo "📌 Node 版本: $(node --version)"
+NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    echo "❌ Node.js 版本过低，需要 >= 18"
+    exit 1
+fi
+
 echo "========================================"
 echo "📦 React Native Bundle Release"
 echo "========================================"
