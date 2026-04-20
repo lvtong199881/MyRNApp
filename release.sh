@@ -179,7 +179,10 @@ echo "📦 创建 GitHub Release..."
 RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"${TAG_MESSAGE}\"}")
+  --data-binary <(cat <<EOF
+{"tag_name":"v${NEW_VERSION}","name":"v${NEW_VERSION}","body":"${TAG_MESSAGE}"}
+EOF
+))
 
 # 解析 release ID（兼容多种响应格式）
 RELEASE_ID=$(echo "$RELEASE_RESPONSE" | node -e "
