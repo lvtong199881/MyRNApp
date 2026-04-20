@@ -43,26 +43,20 @@ echo "========================================"
 echo "🔧 React Native Bundle Debug Release"
 echo "========================================"
 
-# 1. 获取最新的 release tag 作为 base 版本
-CURRENT_RELEASE=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
-if [ -z "$CURRENT_RELEASE" ]; then
-    echo "❌ 未找到 release tag"
+# 1. 获取最新的 debug tag 并自增
+LATEST_DEBUG=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
+if [ -z "$LATEST_DEBUG" ]; then
+    echo "❌ 未找到 debug tag"
     exit 1
 fi
-echo "📌 当前 release 版本: $CURRENT_RELEASE"
+echo "📌 当前 debug 版本: $LATEST_DEBUG"
 
-# 查找该 release 版本之后的最新 debug 版本号
-LATEST_DEBUG=$(git tag -l --sort=-v:refname | grep "^v${CURRENT_RELEASE}\\." | head -1 | sed 's/^v//')
-if [ -z "$LATEST_DEBUG" ]; then
-    # 第一个 debug 版本
-    NEW_VERSION="${CURRENT_RELEASE}.0"
-else
-    # 自增最后一位
-    LAST_NUM=$(echo "$LATEST_DEBUG" | awk -F. '{print $NF}')
-    NEW_NUM=$((LAST_NUM + 1))
-    NEW_VERSION="${CURRENT_RELEASE}.${NEW_NUM}"
-fi
-echo "🆕 Debug 版本: $CURRENT_RELEASE → $NEW_VERSION"
+# 自增最后一位
+LAST_NUM=$(echo "$LATEST_DEBUG" | awk -F. '{print $NF}')
+NEW_NUM=$((LAST_NUM + 1))
+BASE_VERSION=$(echo "$LATEST_DEBUG" | sed 's/\.[^.]*$//')
+NEW_VERSION="${BASE_VERSION}.${NEW_NUM}"
+echo "🆕 Debug 版本: $LATEST_DEBUG → $NEW_VERSION"
 
 # 2. 更新 package.json
 node -e "
