@@ -1,3 +1,10 @@
+## v0.0.9 (2026-04-21)
+
+### 改动
+
+- feat: commit 添加 GitHub 链接，方便快速跳转 ([d4bc84a](https://github.com/lvtong199881/MyRNApp/commit/d4bc84a61d8b5b164c0289ce0eae4c9e24dc46a7))
+
+
 ## v0.0.8 (2026-04-21)
 
 ### 改动
