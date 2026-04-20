@@ -49,7 +49,11 @@ if [ "$MODE" == "debug" ]; then
     echo "========================================"
     COMMIT_FILTER="release:|debug:"
     COMMIT_PREFIX="debug"
-    VERSION_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+    # Debug: 先找 debug tag，没有则用 release tag
+    LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
+    if [ -z "$LATEST_TAG" ]; then
+        LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
+    fi
 else
     echo "========================================"
     echo "📦 React Native Bundle Release"
@@ -57,10 +61,9 @@ else
     COMMIT_FILTER="release:|debug:"
     COMMIT_PREFIX="release"
     VERSION_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+    LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E "$VERSION_PATTERN" | head -1 | sed 's/^v//')
 fi
 
-# 1. 获取最新 tag 并计算新版本
-LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E "$VERSION_PATTERN" | head -1 | sed 's/^v//')
 if [ -z "$LATEST_TAG" ]; then
     echo "❌ 未找到 tag"
     exit 1
