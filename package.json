@@ -9,7 +9,7 @@
     "start": "react-native start",
     "test": "jest",
     "release": "bash release.sh",
-    "debug": "bash debug.sh"
+    "debug": "bash release.sh debug"
   },
   "dependencies": {
     "react": "18.3.1",

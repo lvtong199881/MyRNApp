@@ -1,6 +1,8 @@
 #!/bin/bash
 # React Native Bundle 发布脚本
-# 用法: ./release.sh
+# 用法:
+#   ./release.sh        # 发布 release 版本
+#   ./release.sh debug  # 发布 debug 版本
 
 set -e
 
@@ -8,6 +10,7 @@ set -e
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_OWNER="lvtong199881"
 REPO_NAME=$(node -p "require('./package.json').name")
+MODE="${1:-release}"
 
 # 从环境变量或配置文件读取 GitHub Token
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -39,28 +42,49 @@ if [ "$NODE_VERSION" -lt 18 ]; then
     exit 1
 fi
 
-echo "========================================"
-echo "📦 React Native Bundle Release"
-echo "========================================"
+# 根据模式选择标题和 commit 过滤规则
+if [ "$MODE" == "debug" ]; then
+    echo "========================================"
+    echo "🔧 React Native Bundle Debug Release"
+    echo "========================================"
+    COMMIT_FILTER="release:|debug:"
+    COMMIT_PREFIX="debug"
+    VERSION_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+else
+    echo "========================================"
+    echo "📦 React Native Bundle Release"
+    echo "========================================"
+    COMMIT_FILTER="release:|debug:"
+    COMMIT_PREFIX="release"
+    VERSION_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+fi
 
-# 1. 获取最新的 release tag（排除 debug 版本）
-CURRENT_VERSION=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
-if [ -z "$CURRENT_VERSION" ]; then
-    echo "❌ 未找到 release tag"
+# 1. 获取最新 tag 并计算新版本
+LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E "$VERSION_PATTERN" | head -1 | sed 's/^v//')
+if [ -z "$LATEST_TAG" ]; then
+    echo "❌ 未找到 tag"
     exit 1
 fi
-echo "📌 当前 release 版本: $CURRENT_VERSION"
+echo "📌 当前版本: $LATEST_TAG"
 
-# 2. 计算下一个 release 版本
-IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-MAJOR="${VERSION_PARTS[0]}"
-MINOR="${VERSION_PARTS[1]}"
-PATCH=$(echo "${VERSION_PARTS[2]}" | sed -E 's/[^0-9].*$//')
-NEW_PATCH=$((PATCH + 1))
-NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-echo "🆕 新版本: $CURRENT_VERSION → $NEW_VERSION"
+if [ "$MODE" == "debug" ]; then
+    # Debug: 自增最后一位
+    LAST_NUM=$(echo "$LATEST_TAG" | awk -F. '{print $NF}')
+    NEW_NUM=$((LAST_NUM + 1))
+    BASE_VERSION=$(echo "$LATEST_TAG" | sed 's/\.[^.]*$//')
+    NEW_VERSION="${BASE_VERSION}.${NEW_NUM}"
+else
+    # Release: 取前3段，自增 patch
+    IFS='.' read -ra PARTS <<< "$LATEST_TAG"
+    MAJOR="${PARTS[0]}"
+    MINOR="${PARTS[1]}"
+    PATCH=$(echo "${PARTS[2]}" | sed -E 's/[^0-9].*$//')
+    NEW_PATCH=$((PATCH + 1))
+    NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+fi
+echo "🆕 新版本: $LATEST_TAG → $NEW_VERSION"
 
-# 3. 更新 package.json
+# 2. 更新 package.json
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -69,21 +93,12 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
 echo "✅ package.json 已更新为 v$NEW_VERSION"
 
-# 3. 更新 package.json
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-pkg.version = '$NEW_VERSION';
-fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-"
-echo "✅ package.json 已更新"
-
-# 4. npm install 更新 package-lock.json
+# 3. npm install 更新 package-lock.json
 echo "📦 运行 npm install..."
 npm install --silent
 echo "✅ package-lock.json 已更新"
 
-# 5. 清理并打包 bundle（Android + iOS）
+# 4. 清理并打包 bundle（Android + iOS）
 echo "🔨 打包 bundle..."
 rm -rf dist/
 mkdir -p dist
@@ -118,23 +133,21 @@ if [ ! -s dist/index.ios.bundle ]; then
 fi
 echo "✅ iOS Bundle: dist/index.ios.bundle"
 
-# 6. 获取上一个版本的 commit SHA
+# 5. 获取上一个版本的 commit SHA
 PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')
 if [ -z "$PREV_COMMIT" ]; then
-    PREV_COMMIT=$(git rev-list --max-parents=0 HEAD --format=%s | head -1)
     PREV_COMMIT="initial"
 fi
 echo "📝 上一个版本 commit: $PREV_COMMIT"
 
-# 7. 生成 changelog 内容
+# 6. 生成 changelog 内容
 CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 
 ### 改动
 "
-# 获取自上一个版本以来的所有 commit（带链接，排除 release commit）
 COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
 if [ "$PREV_COMMIT" != "initial" ]; then
-    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep="release:" --invert-grep 2>/dev/null)
+    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -143,7 +156,7 @@ ${COMMITS}"
 - 自动版本更新"
     fi
 else
-    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep="release:" --invert-grep 2>/dev/null)
+    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -152,11 +165,9 @@ ${COMMITS}"
 - 初始版本"
     fi
 fi
-CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+CHANGELOG_CONTENT="${CHANGELOG_CONTENT}"
 
-"
-
-# 8. 更新 CHANGELOG.md
+# 7. 更新 CHANGELOG.md
 if [ -f CHANGELOG.md ]; then
     echo "$CHANGELOG_CONTENT" | cat - CHANGELOG.md > temp_changelog.md && mv temp_changelog.md CHANGELOG.md
 else
@@ -166,32 +177,30 @@ else
 fi
 echo "✅ CHANGELOG.md 已更新"
 
-# 9. Git 提交
+# 8. Git 提交
 git add -A
-git commit -m "release: v$NEW_VERSION"
-echo "✅ 已提交: release: v$NEW_VERSION"
+git commit -m "${COMMIT_PREFIX}: v$NEW_VERSION"
+echo "✅ 已提交: ${COMMIT_PREFIX}: v$NEW_VERSION"
 
-# 10. Git 推送（先 pull rebase 处理冲突）
+# 9. Git 推送（先 pull rebase 处理冲突）
 git fetch origin
 git pull --rebase origin main
 git push
 echo "✅ 已推送到远程仓库"
 
-# 11. 生成 commit diff（带链接，排除 release commit）
+# 10. 生成 tag message 并创建 tag
 echo "📝 生成 commit diff..."
-COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
 if [ "$PREV_COMMIT" != "initial" ]; then
-    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep="release:" --invert-grep 2>/dev/null)
+    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
 else
-    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep="release:" --invert-grep 2>/dev/null)
+    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" --grep -E "$COMMIT_FILTER" --invert-grep 2>/dev/null)
 fi
 git tag -a "v$NEW_VERSION" -m "${TAG_MESSAGE}"
 git push origin "v$NEW_VERSION"
 echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
-# 12. 创建 GitHub Release
+# 11. 创建 GitHub Release
 echo "📦 创建 GitHub Release..."
-# 使用 node 生成 JSON payload（避免 shell 转义问题）
 PAYLOAD=$(node -e "
 const msg = \`${TAG_MESSAGE}\`;
 console.log(JSON.stringify({
@@ -204,7 +213,6 @@ RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/$
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
-# 解析 release ID（兼容多种响应格式）
 RELEASE_ID=$(echo "$RELEASE_RESPONSE" | node -e "
 const data = require('fs').readFileSync(0, 'utf8');
 try {
@@ -219,37 +227,12 @@ if [ -z "$RELEASE_ID" ]; then
     echo "响应: $RELEASE_RESPONSE"
     exit 1
 fi
+echo "✅ Release v$NEW_VERSION 已创建"
 
-if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
-    echo "✅ Release v$NEW_VERSION 已创建"
-else
-    echo "ℹ️ Release 可能已存在，尝试获取..."
-fi
-
-# 13. 获取 release ID
-RELEASE_ID=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${NEW_VERSION}" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" | node -e "
-const data = require('fs').readFileSync(0, 'utf8');
-try {
-  const json = JSON.parse(data);
-  console.log(json.id || '');
-} catch(e) {
-  console.log('');
-}
-")
-
-if [ -z "$RELEASE_ID" ]; then
-    echo "❌ 无法获取 Release ID"
-    exit 1
-fi
-echo "📦 Release ID: $RELEASE_ID"
-
-# 14. 上传 bundle 文件到 Release（带错误检查）
+# 12. 上传 bundle 文件到 Release
 upload_asset() {
     local file="$1"
     local name="$2"
-    local response
-    local asset_id
 
     response=$(curl -s -w "%{http_code}" -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=${name}" \
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
@@ -271,7 +254,7 @@ upload_asset "dist/index.ios.bundle" "index.ios.bundle"
 
 echo ""
 echo "========================================"
-echo "🎉 Release v$NEW_VERSION 完成!"
+echo "🎉 ${COMMIT_PREFIX^} v$NEW_VERSION 完成!"
 echo "========================================"
 echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
 echo "========================================"
