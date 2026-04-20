@@ -1,3 +1,10 @@
+## v0.0.11 (2026-04-21)
+
+### 改动
+
+- fix: 使用 node 生成 JSON payload ([977ee66](https://github.com/lvtong199881/MyRNApp/commit/977ee66fb367ae9cd6fd89d4949e1d93f0571597))
+
+
 ## v0.0.10 (2026-04-21)
 
 ### 改动
