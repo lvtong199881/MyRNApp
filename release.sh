@@ -176,13 +176,18 @@ echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
 # 12. 创建 GitHub Release
 echo "📦 创建 GitHub Release..."
+# 使用 node 生成 JSON payload（避免 shell 转义问题）
+PAYLOAD=$(node -e "
+const msg = \`${TAG_MESSAGE}\`;
+console.log(JSON.stringify({
+  tag_name: 'v${NEW_VERSION}',
+  name: 'v${NEW_VERSION}',
+  body: msg
+}));")
 RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Content-Type: application/json" \
-  --data-binary <(cat <<EOF
-{"tag_name":"v${NEW_VERSION}","name":"v${NEW_VERSION}","body":"${TAG_MESSAGE}"}
-EOF
-))
+  -d "$PAYLOAD")
 
 # 解析 release ID（兼容多种响应格式）
 RELEASE_ID=$(echo "$RELEASE_RESPONSE" | node -e "
