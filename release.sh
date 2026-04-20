@@ -161,8 +161,18 @@ echo "✅ 已提交: release: v$NEW_VERSION"
 git push
 echo "✅ 已推送到远程仓库"
 
-# 11. 创建 git tag
-git tag -a "v$NEW_VERSION" -m "React Native Bundle v$NEW_VERSION"
+# 11. 创建 git tag（包含 commit diff）
+echo "📝 生成 commit diff..."
+TAG_MESSAGE="React Native Bundle v$NEW_VERSION
+
+## Changes since last release
+"
+if [ "$PREV_COMMIT" != "initial" ]; then
+    TAG_MESSAGE="${TAG_MESSAGE}$(git log $PREV_COMMIT..HEAD --format="• %s%n%b" 2>/dev/null)"
+else
+    TAG_MESSAGE="${TAG_MESSAGE}$(git log --oneline --format="• %s" 2>/dev/null)"
+fi
+git tag -a "v$NEW_VERSION" -m "${TAG_MESSAGE}"
 git push origin "v$NEW_VERSION"
 echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
