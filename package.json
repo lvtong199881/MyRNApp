@@ -8,8 +8,8 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "release": "bash release.sh",
-    "debug": "bash release.sh debug"
+    "release": "bash publish.sh",
+    "debug": "bash publish.sh debug"
   },
   "dependencies": {
     "react": "18.3.1",
