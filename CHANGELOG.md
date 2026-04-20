@@ -1,3 +1,10 @@
+## v0.0.12 (2026-04-21)
+
+### 改动
+
+- fix: 排除 release commit，只显示有意义的改动 ([88ed71b](https://github.com/lvtong199881/MyRNApp/commit/88ed71be17f6a560cff58b01b0e9782e69c40292))
+
+
 ## v0.0.11 (2026-04-21)
 
 ### 改动
