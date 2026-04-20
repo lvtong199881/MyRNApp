@@ -70,26 +70,47 @@ echo "📦 运行 npm install..."
 npm install --silent
 echo "✅ package-lock.json 已更新"
 
-# 5. 打包 bundle（Android + iOS）
+# 5. 清理并打包 bundle（Android + iOS）
 echo "🔨 打包 bundle..."
+rm -rf dist/
 mkdir -p dist
 
-node node_modules/@react-native-community/cli/build/bin.js bundle \
-  --platform android \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
+bundle_android() {
+    node node_modules/@react-native-community/cli/build/bin.js bundle \
+      --platform android \
+      --dev false \
+      --entry-file index.js \
+      --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
+}
+
+bundle_ios() {
+    node node_modules/@react-native-community/cli/build/bin.js bundle \
+      --platform ios \
+      --dev false \
+      --entry-file index.js \
+      --bundle-output ./dist/index.ios.bundle > /dev/null 2>&1
+}
+
+bundle_android
+if [ ! -s dist/index.android.bundle ]; then
+    echo "❌ Android Bundle 生成失败"
+    exit 1
+fi
 echo "✅ Android Bundle: dist/index.android.bundle"
 
-node node_modules/@react-native-community/cli/build/bin.js bundle \
-  --platform ios \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output ./dist/index.ios.bundle > /dev/null 2>&1
+bundle_ios
+if [ ! -s dist/index.ios.bundle ]; then
+    echo "❌ iOS Bundle 生成失败"
+    exit 1
+fi
 echo "✅ iOS Bundle: dist/index.ios.bundle"
 
 # 6. 获取上一个版本的 commit SHA
 PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')
+if [ -z "$PREV_COMMIT" ]; then
+    PREV_COMMIT=$(git rev-list --max-parents=0 HEAD --format=%s | head -1)
+    PREV_COMMIT="initial"
+fi
 echo "📝 上一个版本 commit: $PREV_COMMIT"
 
 # 7. 生成 changelog 内容
@@ -98,15 +119,28 @@ CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 ### 改动
 "
 # 获取自上一个版本以来的所有 commit
-COMMITS=$(git log $PREV_COMMIT..HEAD --oneline --format="- %s")
-if [ -n "$COMMITS" ]; then
-    CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+if [ "$PREV_COMMIT" != "initial" ]; then
+    COMMITS=$(git log $PREV_COMMIT..HEAD --oneline --format="- %s")
+    if [ -n "$COMMITS" ]; then
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
-else
-    CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+    else
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 - 自动版本更新"
+    fi
+else
+    COMMITS=$(git log --oneline --format="- %s")
+    if [ -n "$COMMITS" ]; then
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+${COMMITS}"
+    else
+        CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+- 初始版本"
+    fi
 fi
-CHANGELOG_CONTENT="${CHANGELOG_CONTENT}"
+CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
+
+"
 
 # 8. 更新 CHANGELOG.md
 if [ -f CHANGELOG.md ]; then
@@ -163,20 +197,30 @@ if [ -z "$RELEASE_ID" ]; then
 fi
 echo "📦 Release ID: $RELEASE_ID"
 
-# 14. 上传 bundle 文件到 Release
+# 14. 上传 bundle 文件到 Release（带错误检查）
+upload_asset() {
+    local file="$1"
+    local name="$2"
+    local response
+    local asset_id
+
+    response=$(curl -s -w "%{http_code}" -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=${name}" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary @"${file}")
+
+    if echo "$response" | grep -q '"id"'; then
+        echo "✅ ${name} 已上传"
+        return 0
+    else
+        echo "❌ ${name} 上传失败"
+        return 1
+    fi
+}
+
 echo "📤 上传 bundle 文件..."
-
-curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.android.bundle" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary @dist/index.android.bundle > /dev/null
-echo "✅ Android Bundle 已上传"
-
-curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.ios.bundle" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary @dist/index.ios.bundle > /dev/null
-echo "✅ iOS Bundle 已上传"
+upload_asset "dist/index.android.bundle" "index.android.bundle"
+upload_asset "dist/index.ios.bundle" "index.ios.bundle"
 
 echo ""
 echo "========================================"
