@@ -47,11 +47,19 @@ echo "========================================"
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "📌 当前版本: $CURRENT_VERSION"
 
-# 2. 自增 patch 版本
-IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+# 2. 计算下一个 release 版本
+# 规则：如果是 debug 版本（带 .0/.1/.2 等后缀），先去掉后缀，再自增 patch
+# 例如: 0.0.12-mhs.0 → 0.0.13, 0.0.12.0 → 0.0.13, 0.0.12 → 0.0.13
+
+# 去掉 debug 后缀（.0, .1, .2 等）
+BASE_VERSION=$(echo "$CURRENT_VERSION" | sed -E 's/\.[0-9]+$//')
+
+# 如果去掉后缀后和原版本相同，说明本来就不是 debug 版本
+# 自增 patch
+IFS='.' read -ra VERSION_PARTS <<< "$BASE_VERSION"
 MAJOR="${VERSION_PARTS[0]}"
 MINOR="${VERSION_PARTS[1]}"
-PATCH="${VERSION_PARTS[2]:-0}"
+PATCH=$(echo "${VERSION_PARTS[2]:-0}" | sed -E 's/[^0-9].*$//')  # 去掉非数字后缀
 NEW_PATCH=$((PATCH + 1))
 NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
 echo "🆕 新版本: $CURRENT_VERSION → $NEW_VERSION"
