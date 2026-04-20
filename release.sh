@@ -43,29 +43,31 @@ echo "========================================"
 echo "📦 React Native Bundle Release"
 echo "========================================"
 
-# 1. 读取当前版本
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo "📌 当前版本: $CURRENT_VERSION"
+# 1. 获取最新的 release tag（排除 debug 版本）
+CURRENT_VERSION=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^v//')
+if [ -z "$CURRENT_VERSION" ]; then
+    echo "❌ 未找到 release tag"
+    exit 1
+fi
+echo "📌 当前 release 版本: $CURRENT_VERSION"
 
 # 2. 计算下一个 release 版本
-# 规则：如果是 debug 版本（4段），去掉第4段再自增；否则直接自增 patch
-# 例如: 0.0.12.0 → 0.0.13, 0.0.12-mhs.0 → 0.0.13, 0.0.12 → 0.0.13
-
 IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-if [ "${#VERSION_PARTS[@]}" -eq 4 ]; then
-    # Debug 版本：去掉第4段，取前3段
-    MAJOR="${VERSION_PARTS[0]}"
-    MINOR="${VERSION_PARTS[1]}"
-    PATCH=$(echo "${VERSION_PARTS[2]}" | sed -E 's/[^0-9].*$//')
-else
-    # 普通版本：直接取3段
-    MAJOR="${VERSION_PARTS[0]}"
-    MINOR="${VERSION_PARTS[1]}"
-    PATCH=$(echo "${VERSION_PARTS[2]:-0}" | sed -E 's/[^0-9].*$//')
-fi
+MAJOR="${VERSION_PARTS[0]}"
+MINOR="${VERSION_PARTS[1]}"
+PATCH=$(echo "${VERSION_PARTS[2]}" | sed -E 's/[^0-9].*$//')
 NEW_PATCH=$((PATCH + 1))
 NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
 echo "🆕 新版本: $CURRENT_VERSION → $NEW_VERSION"
+
+# 3. 更新 package.json
+node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+pkg.version = '$NEW_VERSION';
+fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+echo "✅ package.json 已更新为 v$NEW_VERSION"
 
 # 3. 更新 package.json
 node -e "
