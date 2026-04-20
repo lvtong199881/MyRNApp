@@ -6,6 +6,21 @@ set -e
 
 # 配置
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_OWNER="lvtong199881"
+REPO_NAME="MyRNApp"
+
+# 从环境变量或配置文件读取 GitHub Token
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+if [ -z "$GITHUB_TOKEN" ]; then
+    if [ -f "$HOME/.github_token" ]; then
+        GITHUB_TOKEN=$(cat "$HOME/.github_token")
+    fi
+fi
+
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ 未设置 GITHUB_TOKEN 环境变量，也找不到 ~/.github_token 文件"
+    exit 1
+fi
 
 cd "$REPO_DIR"
 
@@ -119,7 +134,59 @@ git tag -a "v$NEW_VERSION" -m "React Native Bundle v$NEW_VERSION"
 git push origin "v$NEW_VERSION"
 echo "✅ 已创建并推送 tag: v$NEW_VERSION"
 
+# 12. 创建 GitHub Release（如果不存在）
+echo "📦 创建 GitHub Release..."
+RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"React Native Bundle v${NEW_VERSION}\"}")
+
+# 检查是否创建成功（可能已存在）
+if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
+    echo "✅ Release v$NEW_VERSION 已创建"
+else
+    # 可能已存在，获取现有 release
+    echo "ℹ️ Release 可能已存在，尝试获取..."
+fi
+
+# 13. 获取 release ID
+RELEASE_ID=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${NEW_VERSION}" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" | node -e "
+const data = require('fs').readFileSync(0, 'utf8');
+try {
+  const json = JSON.parse(data);
+  console.log(json.id || '');
+} catch(e) {
+  console.log('');
+}
+")
+
+if [ -z "$RELEASE_ID" ]; then
+    echo "❌ 无法获取 Release ID"
+    exit 1
+fi
+echo "📦 Release ID: $RELEASE_ID"
+
+# 14. 上传 bundle 文件到 Release
+echo "📤 上传 bundle 文件..."
+
+# Android bundle
+curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.android.bundle" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @dist/index.android.bundle > /dev/null
+echo "✅ Android Bundle 已上传"
+
+# iOS bundle
+curl -s -X POST "https://uploads.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${RELEASE_ID}/assets?name=index.ios.bundle" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @dist/index.ios.bundle > /dev/null
+echo "✅ iOS Bundle 已上传"
+
 echo ""
 echo "========================================"
 echo "🎉 Release v$NEW_VERSION 完成!"
+echo "========================================"
+echo "📦 Release: https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}"
 echo "========================================"
