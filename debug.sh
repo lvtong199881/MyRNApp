@@ -168,7 +168,9 @@ git add -A
 git commit -m "debug: v$NEW_VERSION"
 echo "✅ 已提交: debug: v$NEW_VERSION"
 
-# 9. Git 推送
+# 9. Git 推送（先 pull rebase 处理冲突）
+git fetch origin
+git pull --rebase origin main
 git push
 echo "✅ 已推送到远程仓库"
 
