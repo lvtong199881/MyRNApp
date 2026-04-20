@@ -62,8 +62,8 @@ echo "✅ Android Bundle: dist/index.android.bundle"
   --platform ios \
   --dev false \
   --entry-file index.js \
-  --bundle-output ./dist/main.jsbundle > /dev/null 2>&1
-echo "✅ iOS Bundle: dist/main.jsbundle"
+  --bundle-output ./dist/index.ios.bundle > /dev/null 2>&1
+echo "✅ iOS Bundle: dist/index.ios.bundle"
 
 # 6. 获取上一个版本的 commit SHA
 PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')

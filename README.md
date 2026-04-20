@@ -48,9 +48,9 @@ https://github.com/lvtong199881/MyRNApp/raw/{tag}/dist/index.android.bundle
 
 ### iOS
 ```
-https://github.com/lvtong199881/MyRNApp/raw/{tag}/dist/main.jsbundle
+https://github.com/lvtong199881/MyRNApp/raw/{tag}/dist/index.ios.bundle
 ```
 
 或使用 main 分支：
 - Android: `https://github.com/lvtong199881/MyRNApp/raw/main/dist/index.android.bundle`
-- iOS: `https://github.com/lvtong199881/MyRNApp/raw/main/dist/main.jsbundle`
+- iOS: `https://github.com/lvtong199881/MyRNApp/raw/main/dist/index.ios.bundle`
