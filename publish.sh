@@ -68,11 +68,17 @@ fi
 echo "📌 当前版本: $LATEST_TAG"
 
 if [ "$MODE" == "debug" ]; then
-    # Debug: 自增最后一位
-    LAST_NUM=$(echo "$LATEST_TAG" | awk -F. '{print $NF}')
-    NEW_NUM=$((LAST_NUM + 1))
-    BASE_VERSION=$(echo "$LATEST_TAG" | sed 's/\.[^.]*$//')
-    NEW_VERSION="${BASE_VERSION}.${NEW_NUM}"
+    # Debug: 基于最新 release tag 或 debug tag
+    if [[ "$LATEST_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # 是 release 版本，添加 .0
+        NEW_VERSION="${LATEST_TAG}.0"
+    else
+        # 是 debug 版本，自增最后一位
+        LAST_NUM=$(echo "$LATEST_TAG" | awk -F. '{print $NF}')
+        NEW_NUM=$((LAST_NUM + 1))
+        BASE_VERSION=$(echo "$LATEST_TAG" | sed 's/\.[^.]*$//')
+        NEW_VERSION="${BASE_VERSION}.${NEW_NUM}"
+    fi
 else
     # Release: 取前3段，自增 patch
     IFS='.' read -ra PARTS <<< "$LATEST_TAG"
