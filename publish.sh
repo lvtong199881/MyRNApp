@@ -189,12 +189,12 @@ echo "✅ CHANGELOG.md 已更新"
 # 8. Git 提交
 if [ "$MODE" == "debug" ]; then
     git add -A
-    git commit -m "debug(v$NEW_VERSION): Publish React Native debug bundle"
-    echo "✅ 已提交: debug(v$NEW_VERSION): Publish React Native debug bundle"
+    git commit -m "debug: 发布新版本v$NEW_VERSION"
+    echo "✅ 已提交: debug: 发布新版本v$NEW_VERSION"
 else
     git add -A
-    git commit -m "release(v$NEW_VERSION): Publish React Native bundle"
-    echo "✅ 已提交: release(v$NEW_VERSION): Publish React Native bundle"
+    git commit -m "release: 发布新版本v$NEW_VERSION"
+    echo "✅ 已提交: release: 发布新版本v$NEW_VERSION"
 fi
 
 # 9. Git 推送（先 pull rebase 处理冲突）
