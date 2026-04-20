@@ -118,9 +118,10 @@ CHANGELOG_CONTENT="## v$NEW_VERSION ($(date '+%Y-%m-%d'))
 
 ### 改动
 "
-# 获取自上一个版本以来的所有 commit
+# 获取自上一个版本以来的所有 commit（带链接）
+COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
 if [ "$PREV_COMMIT" != "initial" ]; then
-    COMMITS=$(git log $PREV_COMMIT..HEAD --oneline --format="- %s")
+    COMMITS=$(git log $PREV_COMMIT..HEAD --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -129,7 +130,7 @@ ${COMMITS}"
 - 自动版本更新"
     fi
 else
-    COMMITS=$(git log --oneline --format="- %s")
+    COMMITS=$(git log --oneline --format="- %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null)
     if [ -n "$COMMITS" ]; then
         CHANGELOG_CONTENT="${CHANGELOG_CONTENT}
 ${COMMITS}"
@@ -161,12 +162,13 @@ echo "✅ 已提交: release: v$NEW_VERSION"
 git push
 echo "✅ 已推送到远程仓库"
 
-# 11. 创建 git tag（包含 commit diff）
+# 11. 生成 commit diff（带链接）
 echo "📝 生成 commit diff..."
+COMMIT_BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/commit"
 if [ "$PREV_COMMIT" != "initial" ]; then
-    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s%n%b" 2>/dev/null)
+    TAG_MESSAGE=$(git log $PREV_COMMIT..HEAD --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null)
 else
-    TAG_MESSAGE=$(git log --oneline --format="• %s" 2>/dev/null)
+    TAG_MESSAGE=$(git log --oneline --format="• %s ([%h](${COMMIT_BASE_URL}/%H))" 2>/dev/null)
 fi
 git tag -a "v$NEW_VERSION" -m "${TAG_MESSAGE}"
 git push origin "v$NEW_VERSION"
