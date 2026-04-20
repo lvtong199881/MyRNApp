@@ -1,3 +1,8 @@
+## v1.0.1.0 (2026-04-21)
+
+### 改动
+
+- fix: debug 模式找不到 debug tag 时使用 release tag ([24bf4f1](https://github.com/lvtong199881/MyRNApp/commit/24bf4f19915009a715c6b52bb864c993d724aa5a))
 ## v1.0.1 (2026-04-21)
 
 ### 改动
