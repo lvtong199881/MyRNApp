@@ -7,7 +7,7 @@ set -e
 # 配置
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_OWNER="lvtong199881"
-REPO_NAME="MyRNApp"
+REPO_NAME=$(node -p "require('./package.json').name")
 
 # 从环境变量或配置文件读取 GitHub Token
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
