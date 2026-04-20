@@ -41,14 +41,16 @@ npm run release
 
 ## Bundle 加载
 
-Android 端通过以下 URL 加载 bundle：
-
+### Android
 ```
 https://github.com/lvtong199881/MyRNApp/raw/{tag}/dist/index.android.bundle
 ```
 
-或使用 main 分支：
+### iOS
+```
+https://github.com/lvtong199881/MyRNApp/raw/{tag}/dist/main.jsbundle
+```
 
-```
-https://github.com/lvtong199881/MyRNApp/raw/main/dist/index.android.bundle
-```
+或使用 main 分支：
+- Android: `https://github.com/lvtong199881/MyRNApp/raw/main/dist/index.android.bundle`
+- iOS: `https://github.com/lvtong199881/MyRNApp/raw/main/dist/main.jsbundle`

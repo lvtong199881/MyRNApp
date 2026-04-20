@@ -47,15 +47,23 @@ echo "📦 运行 npm install..."
 npm install --silent
 echo "✅ package-lock.json 已更新"
 
-# 5. 打包 bundle
+# 5. 打包 bundle（Android + iOS）
 echo "🔨 打包 bundle..."
 mkdir -p dist
+
 ~/.nvm/versions/node/v24.14.0/bin/node node_modules/@react-native-community/cli/build/bin.js bundle \
   --platform android \
   --dev false \
   --entry-file index.js \
   --bundle-output ./dist/index.android.bundle > /dev/null 2>&1
-echo "✅ Bundle 已生成: dist/index.android.bundle"
+echo "✅ Android Bundle: dist/index.android.bundle"
+
+~/.nvm/versions/node/v24.14.0/bin/node node_modules/@react-native-community/cli/build/bin.js bundle \
+  --platform ios \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output ./dist/main.jsbundle > /dev/null 2>&1
+echo "✅ iOS Bundle: dist/main.jsbundle"
 
 # 6. 获取上一个版本的 commit SHA
 PREV_COMMIT=$(git log --oneline -2 | tail -1 | awk '{print $1}')
