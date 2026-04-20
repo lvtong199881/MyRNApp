@@ -183,6 +183,22 @@ RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/$
   -H "Content-Type: application/json" \
   -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"${TAG_MESSAGE}\"}")
 
+# 解析 release ID（兼容多种响应格式）
+RELEASE_ID=$(echo "$RELEASE_RESPONSE" | node -e "
+const data = require('fs').readFileSync(0, 'utf8');
+try {
+  const json = JSON.parse(data);
+  console.log(json.id || '');
+} catch(e) {
+  console.log('');
+}")
+
+if [ -z "$RELEASE_ID" ]; then
+    echo "❌ Release 创建失败"
+    echo "响应: $RELEASE_RESPONSE"
+    exit 1
+fi
+
 if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
     echo "✅ Release v$NEW_VERSION 已创建"
 else
