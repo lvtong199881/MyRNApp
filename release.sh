@@ -181,7 +181,7 @@ echo "📦 创建 GitHub Release..."
 RELEASE_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"React Native Bundle v${NEW_VERSION}\"}")
+  -d "{\"tag_name\":\"v${NEW_VERSION}\",\"name\":\"v${NEW_VERSION}\",\"body\":\"${TAG_MESSAGE}\"}")
 
 if echo "$RELEASE_RESPONSE" | grep -q '"id"'; then
     echo "✅ Release v$NEW_VERSION 已创建"
