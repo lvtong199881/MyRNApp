@@ -1,3 +1,10 @@
+## v0.0.10 (2026-04-21)
+
+### 改动
+
+- fix: 修复 Release JSON 解析错误 ([8c366ae](https://github.com/lvtong199881/MyRNApp/commit/8c366aeb639e694ac240d6a1f99aa702ea7c3195))
+
+
 ## v0.0.9 (2026-04-21)
 
 ### 改动
