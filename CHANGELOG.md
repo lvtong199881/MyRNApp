@@ -1,3 +1,8 @@
+## v1.0.1 (2026-04-21)
+
+### 改动
+
+- fix: 修复 git log --grep 与 --format 组合导致的 exit code 128 ([b5d66a9](https://github.com/lvtong199881/MyRNApp/commit/b5d66a9d904769ce2cbf69e05359e18544ffcdcd))
 ## v0.0.1 (2026-04-21)
 
 ### 改动
